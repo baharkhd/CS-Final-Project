@@ -5,6 +5,7 @@ from utils import *
 
 all_requests = []
 all_services = []
+wait_times = []
 
 request_orders = [
     RequestType.mobile_order,
@@ -73,8 +74,9 @@ def init_services(service_numbers):
     return services
 
 
-def set_env(env):
-    pass
+def do_service(env, service_type):
+    service_time = get_exp_sample(all_services[service_type.value].mean_time)[0]
+    yield env.timeout(convert_to_minute(service_time))
 
 
 def handle_customer(env, customer_num, system):
@@ -84,33 +86,34 @@ def handle_customer(env, customer_num, system):
 
     arrival_time = env.now
 
-    for service in service_chain:
-        with system.__getattribute__(service.value).request() as request:
+    i = 0
+    for service_type in service_chain:
+        print(i, service_type, customer_num)
+        i += 1
+        with system.__getattribute__(service_type.value).request() as request:
             yield request
             # here we should run a function with env for timeout for a specific time
-            yield env.process(theater.purchase_ticket(moviegoer))
+            yield env.process(do_service(env, service_type))
+
+    finish_time = env.now
+
+    wait_times.append(finish_time - arrival_time)
 
 
 def run_simulation(env, request_rate, system):
     customers = 0
 
-    while True:
+    print("total_time: ", total_time)
+    while customers < 1000:
         customers += 1
+        # print("customers: ", customers, env.now)
         # handle_customer(env, customers)
         env.process(handle_customer(env, customers, system))
 
-        yield env.timeout(request_rate)
+        yield env.timeout(convert_to_minute(request_rate))
 
 
 def start_simulation():
-    service_numbers = [int(i) for i in input().split()]
-
-    request_rate = int(input())
-    total_time = int(input())
-
-    all_services = init_services(service_numbers)
-    all_requests = init_requests()
-
     env = simpy.Environment()
     system = System(env, all_services)
 
@@ -119,4 +122,14 @@ def start_simulation():
 
 
 if __name__ == "__main__":
+    service_numbers = [int(i) for i in input().split()]
+
+    request_rate = int(input())
+    total_time = convert_to_minute(int(input()))
+
+    all_services = init_services(service_numbers)
+    all_requests = init_requests()
+
     start_simulation()
+    print("wait times:", wait_times)
+    print(wait_times)

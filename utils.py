@@ -16,15 +16,19 @@ def get_random_number(likelihoods):
 
 def get_request(request_type, all_requests):
     for r in all_requests:
-        if r.type == request_type:
-            return r
+        if all_requests[r].type == request_type:
+            return all_requests[r]
 
 
 def get_service(service_type, all_services):
     for s in all_services:
-        if s.type == service_type:
-            return s
+        if all_services[s].type == service_type:
+            return all_services[s]
 
 
-def get_exp_sample(mean, samples_num):
+def get_exp_sample(mean, samples_num=1):
     return np.random.exponential(mean, samples_num)
+
+
+def convert_to_minute(seconds):
+    return int(seconds / 60)
