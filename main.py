@@ -1,10 +1,34 @@
 import simpy
-from Entities import ServiceType, Service, RequestType, Request
+import random
+from entities import *
+from utils import *
+
+all_requests = []
+all_services = []
+
+request_orders = [
+    RequestType.mobile_order,
+    RequestType.web_order,
+    RequestType.message_delivery,
+    RequestType.view_info_mobile,
+    RequestType.view_info_web,
+    RequestType.delivery_request,
+    RequestType.followup_order
+]
+
+service_orders = [
+    ServiceType.restaurant_management,
+    ServiceType.customer_management,
+    ServiceType.orders_management,
+    ServiceType.delivery_communication,
+    ServiceType.payment,
+    ServiceType.api_gate,
+    ServiceType.web_gate,
+]
 
 
 def init_requests():
     requests = {}
-    likelihoods = [0.2, 0.1, 0.05, 0.25, 0.15, 0.2, 0.05]
 
     services = {
         RequestType.mobile_order: [ServiceType.api_gate, ServiceType.orders_management, ServiceType.payment],
@@ -18,18 +42,18 @@ def init_requests():
         RequestType.followup_order: [ServiceType.api_gate, ServiceType.orders_management]
     }
 
-    request_orders = [
-        RequestType.mobile_order,
-        RequestType.web_order,
-        RequestType.message_delivery,
-        RequestType.view_info_mobile,
-        RequestType.view_info_web,
-        RequestType.delivery_request,
-        RequestType.followup_order
-    ]
+    priorities = {
+        RequestType.mobile_order: 1,
+        RequestType.web_order: 1,
+        RequestType.message_delivery: 2,
+        RequestType.view_info_mobile: 2,
+        RequestType.view_info_web: 2,
+        RequestType.delivery_request: 1,
+        RequestType.followup_order: 2
+    }
 
-    for request_type, l in zip(request_orders, likelihoods):
-        requests[request_type] = Request(request_type, l, services[request_type])
+    for request_type, l in zip(request_orders, request_likelihoods):
+        requests[request_type] = Request(request_type, l, services[request_type], priorities[request_type])
 
     return requests
 
@@ -40,41 +64,59 @@ def init_services(service_numbers):
     mean_service_times = [8, 5, 6, 9, 12, 2, 3]
     error_rates = [0.02, 0.02, 0.03, 0, 1, 0, 2, 0.01, 0.01]
 
-    service_orders = [
-        ServiceType.restaurant_management,
-        ServiceType.customer_management,
-        ServiceType.orders_management,
-        ServiceType.delivery_communication,
-        ServiceType.payment,
-        ServiceType.api_gate,
-        ServiceType.web_gate,
-    ]
-
     max_times = [int(i) for i in input().split()]
 
-    for i, (service_type, service_num) in zip(service_orders, service_numbers):
+    for i, (service_type, service_num) in enumerate(zip(service_orders, service_numbers)):
         services[service_type.value] = Service(service_type, service_num, mean_service_times[i], max_times[i],
                                                error_rates[i])
 
     return services
 
 
-def get_inputs():
+def set_env(env):
+    pass
+
+
+def handle_customer(env, customer_num, system):
+    request_type = request_orders[get_random_number(request_likelihoods)]
+    request = get_request(request_type, all_requests)
+    service_chain = request.services
+
+    arrival_time = env.now
+
+    for service in service_chain:
+        with system.__getattribute__(service.value).request() as request:
+            yield request
+            # here we should run a function with env for timeout for a specific time
+            yield env.process(theater.purchase_ticket(moviegoer))
+
+
+def run_simulation(env, request_rate, system):
+    customers = 0
+
+    while True:
+        customers += 1
+        # handle_customer(env, customers)
+        env.process(handle_customer(env, customers, system))
+
+        yield env.timeout(request_rate)
+
+
+def start_simulation():
     service_numbers = [int(i) for i in input().split()]
 
     request_rate = int(input())
-    time = int(input())
+    total_time = int(input())
 
-    services = init_services(service_numbers)
-    requests = init_requests()
+    all_services = init_services(service_numbers)
+    all_requests = init_requests()
 
-
-def simulation():
-    get_inputs()
     env = simpy.Environment()
+    system = System(env, all_services)
 
-    env.run(until=10)
+    env.process(run_simulation(env, request_rate, system))
+    env.run(until=total_time)
 
 
 if __name__ == "__main__":
-    simulation()
+    start_simulation()

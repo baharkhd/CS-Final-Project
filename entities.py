@@ -1,4 +1,7 @@
 from enum import Enum
+import simpy
+
+request_likelihoods = [0.2, 0.1, 0.05, 0.25, 0.15, 0.2, 0.05]
 
 
 class ServiceType(Enum):
@@ -23,7 +26,7 @@ class RequestType(Enum):
 
 class Service:
     def __init__(self, service_type: ServiceType, number, mean_service_time, max_time, error_rate):
-        self.service_type = service_type
+        self.type = service_type
         self.number = number
         self.mean_time = mean_service_time
         self.max_time = max_time
@@ -31,7 +34,18 @@ class Service:
 
 
 class Request:
-    def __init__(self, request_type, occurrence_likelihood, services):
-        self.request_type = request_type
+    def __init__(self, request_type, occurrence_likelihood, services, priority):
+        self.type = request_type
         self.occurrence_likelihood = occurrence_likelihood
         self.services = services
+        self.priority = priority
+
+
+# how to get attribute of system
+# system.__getattribute__(ServiceType.restaurant_management.value)
+
+class System:
+    def __init__(self, env, services):
+        self.env = env
+        for s in services:
+            setattr(self, services[s].type.value, simpy.Resource(env, services[s].number))
