@@ -90,7 +90,6 @@ def handle_customer(env, customer_num, system):
     for service_type in service_chain:
         with system.__getattribute__(service_type.value).request() as request:
             yield request
-            # here we should run a function with env for timeout for a specific time
             yield env.process(do_service(env, service_type))
 
     finish_time = env.now
@@ -101,15 +100,9 @@ def handle_customer(env, customer_num, system):
 def run_simulation(env, system):
     customers = 0
 
-    print("total_time:", total_time)
     while True:
         customers += 1
-        # print("customers: ", customers, env.now)
-        # handle_customer(env, customers)
         env.process(handle_customer(env, customers, system))
-
-        # print("---------", request_rate)
-        # print("******", convert_to_minute(request_rate))
         yield env.timeout(request_rate / 60)
 
 
