@@ -76,6 +76,7 @@ def init_services(service_numbers):
 
 def do_service(env, service_type):
     service_time = get_exp_sample(all_services[service_type.value].mean_time)[0]
+    # print(service_time, convert_to_minute(service_time))
     yield env.timeout(convert_to_minute(service_time))
 
 
@@ -86,10 +87,7 @@ def handle_customer(env, customer_num, system):
 
     arrival_time = env.now
 
-    i = 0
     for service_type in service_chain:
-        print(i, service_type, customer_num)
-        i += 1
         with system.__getattribute__(service_type.value).request() as request:
             yield request
             # here we should run a function with env for timeout for a specific time
@@ -100,24 +98,26 @@ def handle_customer(env, customer_num, system):
     wait_times.append(finish_time - arrival_time)
 
 
-def run_simulation(env, request_rate, system):
+def run_simulation(env, system):
     customers = 0
 
-    print("total_time: ", total_time)
-    while customers < 1000:
+    print("total_time:", total_time)
+    while True:
         customers += 1
         # print("customers: ", customers, env.now)
         # handle_customer(env, customers)
         env.process(handle_customer(env, customers, system))
 
-        yield env.timeout(convert_to_minute(request_rate))
+        # print("---------", request_rate)
+        # print("******", convert_to_minute(request_rate))
+        yield env.timeout(request_rate / 60)
 
 
 def start_simulation():
     env = simpy.Environment()
     system = System(env, all_services)
 
-    env.process(run_simulation(env, request_rate, system))
+    env.process(run_simulation(env, system))
     env.run(until=total_time)
 
 
@@ -131,5 +131,6 @@ if __name__ == "__main__":
     all_requests = init_requests()
 
     start_simulation()
-    print("wait times:", wait_times)
-    print(wait_times)
+    print("wait times")
+    for wt in wait_times:
+        print(wt * 60, "min")

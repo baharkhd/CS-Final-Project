@@ -31,4 +31,5 @@ def get_exp_sample(mean, samples_num=1):
 
 
 def convert_to_minute(seconds):
-    return int(seconds / 60)
+    # return int(seconds / 60)
+    return seconds / 60
