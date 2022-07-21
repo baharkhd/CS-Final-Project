@@ -2,6 +2,8 @@ import simpy
 import random
 from entities import *
 from utils import *
+from statistics import mean
+
 
 all_requests = []
 all_services = []
@@ -74,10 +76,10 @@ def init_services(service_numbers):
     return services
 
 
-def do_service(env, service_type):
-    service_time = get_exp_sample(all_services[service_type.value].mean_time)[0]
+def do_service(env, service_time):
+    # service_time = get_exp_sample(all_services[service_type.value].mean_time)[0]
     # print(service_time, convert_to_minute(service_time))
-    yield env.timeout(convert_to_minute(service_time))
+    yield env.timeout(service_time)
 
 
 def handle_customer(env, customer_num, system):
@@ -87,23 +89,29 @@ def handle_customer(env, customer_num, system):
 
     arrival_time = env.now
 
+    service_time_total = 0
     for service_type in service_chain:
         with system.__getattribute__(service_type.value).request() as request:
+            # print(system.__getattribute__(service_type.value))
+            service_time = convert_to_minute(get_exp_sample(all_services[service_type.value].mean_time)[0])
+            service_time_total += service_time
             yield request
-            yield env.process(do_service(env, service_type))
+            yield env.process(do_service(env, service_time))
 
     finish_time = env.now
 
-    wait_times.append(finish_time - arrival_time)
+    wait_times.append(finish_time - arrival_time - service_time_total)
 
 
 def run_simulation(env, system):
     customers = 0
 
     while True:
-        customers += 1
-        env.process(handle_customer(env, customers, system))
-        yield env.timeout(request_rate / 60)
+        customers += request_rate
+        for i in range(request_rate):
+            env.process(handle_customer(env, customers, system))
+        # print(customers)
+        yield env.timeout(1 / 60)
 
 
 def start_simulation():
@@ -124,6 +132,10 @@ if __name__ == "__main__":
     all_requests = init_requests()
 
     start_simulation()
-    print("wait times")
+    print("wait times in queues")
     for wt in wait_times:
-        print(wt * 60, "min")
+        print(wt, "min")
+
+    print(len(wait_times))
+    print("wait times avg")
+    print(mean(wait_times), 'min')
