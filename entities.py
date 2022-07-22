@@ -31,6 +31,9 @@ class Service:
         self.mean_time = mean_service_time
         self.max_time = max_time
         self.error_rate = error_rate
+        self.idle_start = 0
+        self.idle = True
+        self.idle_time = 0
 
 
 class Request:
@@ -48,4 +51,4 @@ class System:
     def __init__(self, env, services):
         self.env = env
         for s in services:
-            setattr(self, services[s].type.value, simpy.Resource(env, services[s].number))
+            setattr(self, services[s].type.value, simpy.PriorityResource(env, services[s].number))
