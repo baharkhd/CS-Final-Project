@@ -4,7 +4,6 @@ from entities import *
 from utils import *
 from statistics import mean
 
-
 all_requests = []
 all_services = []
 wait_times = []
@@ -91,48 +90,35 @@ def handle_customer(env, customer_num, system):
     service_chain = request.services
 
     arrival_time = env.now
+    print(f"customer {customer_num} arrival time {round(arrival_time * 60, 2)} - request: {request_type}")
 
     service_time_total = 0
     for service_type in service_chain:
-        with system.__getattribute__(service_type.value).request(priority=request.priority) as request:
-            # print('---', service_type.value, '---')
-            # for q in system.__getattribute__(service_type.value).queue:
-            #     print('+++')
-            #     print(q.priority)
-            #     print('+++')
-            # print('********')
+        with system.__getattribute__(service_type.value).request() as request:
             # print(system.__getattribute__(service_type.value))
-            # print(len(system.__getattribute__(service_type.value).queue), ':', service_type.value)
-
-            # print(service_type.value, system.__getattribute__(service_type.value).capacity)
-
-            if service_type.value in queues.keys():
-                queues[service_type.value].append(len(system.__getattribute__(service_type.value).queue))
-            else:
-                queues[service_type.value] = [len(system.__getattribute__(service_type.value).queue)]
-
             service_time = convert_to_minute(get_exp_sample(all_services[service_type.value].mean_time)[0])
             service_time_total += service_time
-
+            print(f"customer {customer_num} service {service_type}  service time:", round(service_time * 60, 2))
             yield request
             yield env.process(do_service(env, service_time))
 
-            if service_type.value in server_usage.keys():
-                server_usage[service_type.value].append(service_time)
-            else:
-                server_usage[service_type.value] = [service_time]
-
     finish_time = env.now
+    print(f"customer {customer_num} finish time:", round(finish_time * 60, 2))
+
+    print(f"customer {customer_num} wait time:", round((finish_time - arrival_time - service_time_total) * 60, 2))
+
     wait_times.append(finish_time - arrival_time - service_time_total)
 
 
 def run_simulation(env, system):
     customers = 0
 
+    customer_id = 0
     while True:
         customers += request_rate
         for i in range(request_rate):
-            env.process(handle_customer(env, customers, system))
+            env.process(handle_customer(env, customer_id, system))
+            customer_id += 1
         # print(customers)
         yield env.timeout(1 / 60)
 
