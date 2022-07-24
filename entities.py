@@ -31,9 +31,6 @@ class Service:
         self.mean_time = mean_service_time
         self.max_time = max_time
         self.error_rate = error_rate
-        self.idle_start = 0
-        self.idle = True
-        self.idle_time = 0
 
 
 class Request:
