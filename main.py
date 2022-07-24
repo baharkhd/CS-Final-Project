@@ -10,7 +10,7 @@ all_services = []
 wait_times = []
 
 queues = {}
-# server_usage = {}
+server_usage = {}
 
 request_orders = [
     RequestType.mobile_order,
@@ -103,21 +103,24 @@ def handle_customer(env, customer_num, system):
             # print('********')
             # print(system.__getattribute__(service_type.value))
             # print(len(system.__getattribute__(service_type.value).queue), ':', service_type.value)
+
+            # print(service_type.value, system.__getattribute__(service_type.value).capacity)
+
             if service_type.value in queues.keys():
                 queues[service_type.value].append(len(system.__getattribute__(service_type.value).queue))
             else:
                 queues[service_type.value] = [len(system.__getattribute__(service_type.value).queue)]
-
-            # if service_type.value in server_usage.keys():
-            #     server_usage[service_type.value].append()
-            # else:
-            #     server_usage[service_type.value] = []
 
             service_time = convert_to_minute(get_exp_sample(all_services[service_type.value].mean_time)[0])
             service_time_total += service_time
 
             yield request
             yield env.process(do_service(env, service_time))
+
+            if service_type.value in server_usage.keys():
+                server_usage[service_type.value].append(service_time)
+            else:
+                server_usage[service_type.value] = [service_time]
 
     finish_time = env.now
     wait_times.append(finish_time - arrival_time - service_time_total)
@@ -162,3 +165,7 @@ if __name__ == "__main__":
     print('avg queue lengths:')
     for queue in queues.keys():
         print(f'{queue}: {mean(queues[queue])}')
+
+    print('server time usage')
+    for server in server_usage.keys():
+        print(f'{server}: {sum(server_usage[server]) / total_time}')
