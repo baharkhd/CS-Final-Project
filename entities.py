@@ -39,6 +39,7 @@ class Request:
         self.services = services
         self.priority = priority
         self.max_time = max_time
+        self.timeout = False
 
 
 # how to get attribute of system

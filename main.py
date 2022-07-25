@@ -5,10 +5,11 @@ from utils import *
 
 all_requests = []
 all_services = []
-wait_times = []
+timeouts = []
 
 queues = {}
 server_usage = {}
+wait_times = {}
 
 request_orders = [
     RequestType.mobile_order,
@@ -61,7 +62,7 @@ def init_requests():
 
     for i in range(len(max_times)):
         req = request_orders[i]
-        max_times_dict[req] = max_times[i]
+        max_times_dict[req] = convert_to_minute(max_times[i])
 
     for request_type, l in zip(request_orders, request_likelihoods):
         requests[request_type] = Request(request_type, l, services[request_type], max_times_dict[request_type],
@@ -110,9 +111,15 @@ def handle_customer(env, customer_num, system):
             # print(service_type.value, system.__getattribute__(service_type.value).capacity)
 
             service_time = convert_to_minute(get_exp_sample(all_services[service_type.value].mean_time)[0])
-            service_time_total += service_time
 
             yield req
+
+            if service_time_total + arrival_time > request.max_time:
+                request.timeout = True
+                # print('man hanooz zendam koskesh')
+                break
+
+            service_time_total += service_time
             yield env.process(do_service(env, service_time))
 
             if service_type.value in server_usage.keys():
@@ -121,7 +128,18 @@ def handle_customer(env, customer_num, system):
                 server_usage[service_type.value] = [service_time]
 
     finish_time = env.now
-    wait_times.append(max(finish_time - arrival_time - service_time_total, 0))
+
+    # print(request.type)
+    # print(arrival_time)
+    # print(service_time_total)
+    # print(finish_time)
+
+    if request.type in wait_times.keys():
+        wait_times[request.type].append(max(finish_time - arrival_time - service_time_total, 0))
+    else:
+        wait_times[request_type] = [max(finish_time - arrival_time - service_time_total, 0)]
+
+    timeouts.append(request.timeout)
 
 
 def run_simulation(env, system):
@@ -131,7 +149,6 @@ def run_simulation(env, system):
         customers += request_rate
         for i in range(request_rate):
             env.process(handle_customer(env, customers, system))
-        # print(customers)
 
         for service in service_orders:
             if service.value in queues.keys():
@@ -160,17 +177,24 @@ if __name__ == "__main__":
     all_requests = init_requests()
 
     start_simulation()
-    print("wait times in queues")
-    for wt in wait_times:
-        print(wt, "min")
 
-    print(len(wait_times))
-    print("wait times avg")
-    print(mean(wait_times), 'min')
-    print('avg queue lengths:')
+    print("**** wait times in queues ****")
+    total_waiting = 0
+    for wt in wait_times.keys():
+        total_waiting += mean(wait_times[wt])
+        print(f'{wt}: {mean(wait_times[wt])}')
+
+    print("**** wait times total avg ****")
+    print(total_waiting / len(wait_times), 'min')
+
+    print('**** avg queue lengths ****')
     for queue in queues.keys():
         print(f'{queue}: {mean(queues[queue])}')
 
-    print('server time usage')
+    print('**** server time usage ****')
     for server in server_usage.keys():
+        service = get_service(server, all_services)
         print(f'{server}: {sum(server_usage[server]) / total_time}')
+
+    print("**** timeout avg ****")
+    print(mean(timeouts))
