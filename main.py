@@ -1,9 +1,7 @@
-import simpy
-import random
-from entities import *
-from utils import *
 from statistics import mean
 
+from entities import *
+from utils import *
 
 all_requests = []
 all_services = []
@@ -58,8 +56,16 @@ def init_requests():
         RequestType.followup_order: 2
     }
 
+    max_times = [int(i) for i in input().split()]
+    max_times_dict = {}
+
+    for i in range(len(max_times)):
+        req = request_orders[i]
+        max_times_dict[req] = max_times[i]
+
     for request_type, l in zip(request_orders, request_likelihoods):
-        requests[request_type] = Request(request_type, l, services[request_type], priorities[request_type])
+        requests[request_type] = Request(request_type, l, services[request_type], max_times_dict[request_type],
+                                         priorities[request_type])
 
     return requests
 
@@ -70,11 +76,8 @@ def init_services(service_numbers):
     mean_service_times = [8, 5, 6, 9, 12, 2, 3]
     error_rates = [0.02, 0.02, 0.03, 0, 1, 0, 2, 0.01, 0.01]
 
-    max_times = [int(i) for i in input().split()]
-
     for i, (service_type, service_num) in enumerate(zip(service_orders, service_numbers)):
-        services[service_type.value] = Service(service_type, service_num, mean_service_times[i], max_times[i],
-                                               error_rates[i])
+        services[service_type.value] = Service(service_type, service_num, mean_service_times[i], error_rates[i])
 
     return services
 
@@ -94,7 +97,7 @@ def handle_customer(env, customer_num, system):
 
     service_time_total = 0
     for service_type in service_chain:
-        with system.__getattribute__(service_type.value).request(priority=request.priority) as request:
+        with system.__getattribute__(service_type.value).request(priority=request.priority) as req:
             # print('---', service_type.value, '---')
             # for q in system.__getattribute__(service_type.value).queue:
             #     print('+++')
@@ -106,15 +109,10 @@ def handle_customer(env, customer_num, system):
 
             # print(service_type.value, system.__getattribute__(service_type.value).capacity)
 
-            if service_type.value in queues.keys():
-                queues[service_type.value].append(len(system.__getattribute__(service_type.value).queue))
-            else:
-                queues[service_type.value] = [len(system.__getattribute__(service_type.value).queue)]
-
             service_time = convert_to_minute(get_exp_sample(all_services[service_type.value].mean_time)[0])
             service_time_total += service_time
 
-            yield request
+            yield req
             yield env.process(do_service(env, service_time))
 
             if service_type.value in server_usage.keys():
@@ -123,7 +121,7 @@ def handle_customer(env, customer_num, system):
                 server_usage[service_type.value] = [service_time]
 
     finish_time = env.now
-    wait_times.append(finish_time - arrival_time - service_time_total)
+    wait_times.append(max(finish_time - arrival_time - service_time_total, 0))
 
 
 def run_simulation(env, system):
@@ -134,6 +132,13 @@ def run_simulation(env, system):
         for i in range(request_rate):
             env.process(handle_customer(env, customers, system))
         # print(customers)
+
+        for service in service_orders:
+            if service.value in queues.keys():
+                queues[service.value].append(len(system.__getattribute__(service.value).queue))
+            else:
+                queues[service.value] = [len(system.__getattribute__(service.value).queue)]
+
         yield env.timeout(1 / 60)
 
 

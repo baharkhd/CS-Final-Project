@@ -25,20 +25,20 @@ class RequestType(Enum):
 
 
 class Service:
-    def __init__(self, service_type: ServiceType, number, mean_service_time, max_time, error_rate):
+    def __init__(self, service_type: ServiceType, number, mean_service_time, error_rate):
         self.type = service_type
         self.number = number
         self.mean_time = mean_service_time
-        self.max_time = max_time
         self.error_rate = error_rate
 
 
 class Request:
-    def __init__(self, request_type, occurrence_likelihood, services, priority):
+    def __init__(self, request_type, occurrence_likelihood, services, priority, max_time):
         self.type = request_type
         self.occurrence_likelihood = occurrence_likelihood
         self.services = services
         self.priority = priority
+        self.max_time = max_time
 
 
 # how to get attribute of system
