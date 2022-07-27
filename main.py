@@ -93,9 +93,9 @@ def do_service(env, service_time, customer_num, service_index, request, service_
     request.service_time = service_time
     if request_started[customer_num]:
         time_value = service_time
-        yield env.timeout(service_time)
+        yield env.timeout(service_time / 60)
     else:
-        if request.max_time < env.now - arrivals[customer_num] and service_index == 0:
+        if request.max_time < env.now * 60 - arrivals[customer_num] * 60 and service_index == 0:
             timeouts[customer_num] = True
             request.service_time = 0
             time_value = 0
@@ -103,7 +103,7 @@ def do_service(env, service_time, customer_num, service_index, request, service_
         else:
             request_started[customer_num] = True
             time_value = service_time
-            yield env.timeout(service_time)
+            yield env.timeout(service_time / 60)
 
     if service_type in server_usage.keys():
         server_usage[service_type].append(time_value)
@@ -155,8 +155,8 @@ def run_simulation(env, system):
             else:
                 queues[s.value] = [len(system.__getattribute__(s.value).queue)]
 
-        # yield env.timeout(1 / 60)
-        yield env.timeout(1)
+        yield env.timeout(1 / 60)
+        # yield env.timeout(1)
 
 
 def start_simulation():
@@ -164,7 +164,7 @@ def start_simulation():
     system = System(env, all_services)
 
     env.process(run_simulation(env, system))
-    env.run(until=total_time)
+    env.run(until=total_time / 60)
 
 
 if __name__ == "__main__":
