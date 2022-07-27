@@ -127,11 +127,12 @@ def handle_customer(env, customer_num, system, request):
             service_time_total += request.service_time
 
     finish_time = env.now
+    print("^^^^^^^^", finish_time, arrival_time, service_time_total)
 
     if request.type in wait_times.keys():
-        wait_times[request_type].append(max(finish_time - arrival_time - service_time_total, 0))
+        wait_times[request_type].append(max(round_number((finish_time - arrival_time) * 60) - service_time_total, 0))
     else:
-        wait_times[request_type] = [max(finish_time - arrival_time - service_time_total, 0)]
+        wait_times[request_type] = [max(round_number(finish_time - arrival_time) * 60 - service_time_total, 0)]
 
 
 def run_simulation(env, system):
