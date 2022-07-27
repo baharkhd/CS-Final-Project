@@ -89,18 +89,27 @@ def init_services(service_nums):
     return services
 
 
-def do_service(env, service_time, customer_num, service_index, request):
+def do_service(env, service_time, customer_num, service_index, request, service_type):
+    time_value = 0
     request.service_time = service_time
     if request_started[customer_num]:
+        time_value = service_time
         yield env.timeout(service_time)
     else:
         if request.max_time < env.now - arrivals[customer_num] and service_index == 0:
             timeouts[customer_num] = True
             request.service_time = 0
+            time_value = 0
             yield env.timeout(0)
         else:
             request_started[customer_num] = True
+            time_value = service_time
             yield env.timeout(service_time)
+
+    if service_type in server_usage.keys():
+        server_usage[service_type].append(time_value)
+    else:
+        server_usage[service_type] = [time_value]
 
 
 def handle_customer(env, customer_num, system, request):
@@ -117,15 +126,15 @@ def handle_customer(env, customer_num, system, request):
             yield req
 
             service_time_total += service_time
-            yield env.process(do_service(env, service_time, customer_num, s_idx, request))
+            yield env.process(do_service(env, service_time, customer_num, s_idx, request, service_type))
 
             # if not request.service_time:
             #     system.__getattribute__(service_type.value).cancel()
 
-            if service_type in server_usage.keys():
-                server_usage[service_type].append(request.service_time)
-            else:
-                server_usage[service_type] = [request.service_time]
+            # if service_type in server_usage.keys():
+            #     server_usage[service_type].append(request.service_time)
+            # else:
+            #     server_usage[service_type] = [request.service_time]
 
     finish_time = env.now
 
@@ -199,6 +208,5 @@ if __name__ == "__main__":
 
     print("**** timeout avg ****")
     print(mean(timeouts.values()))
-
 
     # print(server_usage)
