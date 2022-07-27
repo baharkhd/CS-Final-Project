@@ -129,8 +129,8 @@ def handle_customer(env, customer_num, system, request):
 
             # print("+++++", request.type.value, request.max_time)
 
-            service_time_total += service_time
             yield env.process(do_service(env, service_time, customer_num, s_idx, request))
+            service_time_total += request.service_time
 
             # if not request.service_time:
             #     system.__getattribute__(service_type.value).cancel()
@@ -143,7 +143,7 @@ def handle_customer(env, customer_num, system, request):
     finish_time = env.now
 
     if request.type in wait_times.keys():
-        wait_times[request.type].append(max(finish_time - arrival_time - service_time_total, 0))
+        wait_times[request_type].append(max(finish_time - arrival_time - service_time_total, 0))
     else:
         wait_times[request_type] = [max(finish_time - arrival_time - service_time_total, 0)]
 
@@ -214,7 +214,7 @@ if __name__ == "__main__":
         print(f'{wt}: {mean(wait_times[wt])}')
 
     print("**** wait times total avg ****")
-    print(total_waiting / len(wait_times), 'second')
+    print(total_waiting / len(wait_times), 'min')
 
     print('**** avg queue lengths ****')
     for queue in queues.keys():
@@ -227,6 +227,3 @@ if __name__ == "__main__":
 
     print("**** timeout avg ****")
     print(mean(timeouts.values()))
-
-
-    # print(server_usage)
