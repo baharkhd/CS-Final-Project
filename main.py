@@ -1,5 +1,5 @@
-import simpy
 from statistics import mean
+
 from entities import *
 from utils import *
 
@@ -76,25 +76,27 @@ def init_requests():
     return requests
 
 
-def init_services(service_numbers):
+def init_services(service_nums):
     services = {}
 
     mean_service_times = [8, 5, 6, 9, 12, 2, 3]
     error_rates = [0.02, 0.02, 0.03, 0, 1, 0, 2, 0.01, 0.01]
 
-    for i, (service_type, service_num) in enumerate(zip(service_orders, service_numbers)):
+    for i, (service_type, service_num) in enumerate(zip(service_orders, service_nums)):
         services[service_type.value] = Service(service_type, service_num, mean_service_times[i], error_rates[i])
 
     return services
 
 
 def do_service(env, service_time, customer_num, service_index, request):
+    request.service_time = service_time
     if request_started[customer_num]:
         yield env.timeout(service_time)
     else:
         # print("------", customer_num, service_index, request.max_time, env.now, arrivals[customer_num])
         if request.max_time < env.now - arrivals[customer_num] and service_index == 0:
             timeouts[customer_num] = True
+            request.service_time = 0
             yield env.timeout(0)
         else:
             request_started[customer_num] = True
@@ -129,6 +131,14 @@ def handle_customer(env, customer_num, system, request):
 
             service_time_total += service_time
             yield env.process(do_service(env, service_time, customer_num, s_idx, request))
+
+            # if not request.service_time:
+            #     system.__getattribute__(service_type.value).cancel()
+
+            if service_type in server_usage.keys():
+                server_usage[service_type].append(request.service_time)
+            else:
+                server_usage[service_type] = [request.service_time]
 
     finish_time = env.now
 
@@ -204,16 +214,19 @@ if __name__ == "__main__":
         print(f'{wt}: {mean(wait_times[wt])}')
 
     print("**** wait times total avg ****")
-    print(total_waiting / len(wait_times), 'min')
+    print(total_waiting / len(wait_times), 'second')
 
     print('**** avg queue lengths ****')
     for queue in queues.keys():
         print(f'{queue}: {mean(queues[queue])}')
 
-    print('**** server time usage ****')
+    print('**** server utilization ****')
     for server in server_usage.keys():
         service = get_service(server, all_services)
-        print(f'{server}: {sum(server_usage[server]) / total_time}')
+        print(f'{server.value}: {sum(server_usage[server]) / total_time / service.number}')
 
     print("**** timeout avg ****")
     print(mean(timeouts.values()))
+
+
+    # print(server_usage)

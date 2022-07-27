@@ -40,6 +40,7 @@ class Request:
         self.priority = priority
         self.max_time = max_time
         self.timeout = False
+        self.service_time = 0
 
 
 # how to get attribute of system
