@@ -88,29 +88,27 @@ def init_services(service_nums):
     return services
 
 
-def do_service(env, service_time, customer_num, service_index, request):
+def do_service(env, service_time, customer_num, service_index, request, service_type):
+    time_value = 0
     request.service_time = service_time
     if request_started[customer_num]:
+        time_value = service_time
         yield env.timeout(service_time)
     else:
-        # print("------", customer_num, service_index, request.max_time, env.now, arrivals[customer_num])
         if request.max_time < env.now - arrivals[customer_num] and service_index == 0:
             timeouts[customer_num] = True
             request.service_time = 0
+            time_value = 0
             yield env.timeout(0)
         else:
             request_started[customer_num] = True
+            time_value = service_time
             yield env.timeout(service_time)
-    # if service_index == 0 and not timeouts[customer_num]:
-    #     request_started[customer_num] = True
-    #
-    # if customer_num in timeouts.keys():
-    #     if timeouts[customer_num]:
-    #         yield env.timeout(0)
-    #     else:
-    #         yield env.timeout(service_time)
-    # else:
-    #     yield env.timeout(service_time)
+
+    if service_type in server_usage.keys():
+        server_usage[service_type].append(time_value)
+    else:
+        server_usage[service_type] = [time_value]
 
 
 def handle_customer(env, customer_num, system, request):
@@ -118,8 +116,6 @@ def handle_customer(env, customer_num, system, request):
     service_chain = request.services
 
     arrival_time = env.now
-
-    # print(f"customer {customer_num} arrival time {round(arrival_time * 60, 2)} - request: {request_type}")
 
     service_time_total = 0
     for s_idx, service_type in enumerate(service_chain):
@@ -135,10 +131,10 @@ def handle_customer(env, customer_num, system, request):
             # if not request.service_time:
             #     system.__getattribute__(service_type.value).cancel()
 
-            if service_type in server_usage.keys():
-                server_usage[service_type].append(request.service_time)
-            else:
-                server_usage[service_type] = [request.service_time]
+            # if service_type in server_usage.keys():
+            #     server_usage[service_type].append(request.service_time)
+            # else:
+            #     server_usage[service_type] = [request.service_time]
 
     finish_time = env.now
 
@@ -146,19 +142,6 @@ def handle_customer(env, customer_num, system, request):
         wait_times[request_type].append(max(finish_time - arrival_time - service_time_total, 0))
     else:
         wait_times[request_type] = [max(finish_time - arrival_time - service_time_total, 0)]
-
-
-def check_timeouts(env):
-    global timeouts
-    now = env.now
-
-    for i in range(customer_id):
-        req = customers_requests[i]
-        arrival_time = arrivals[i]
-        if now - arrival_time > req.max_time and not request_started[i]:
-            timeouts[i] = True
-        else:
-            timeouts[i] = False
 
 
 def run_simulation(env, system):
@@ -181,8 +164,6 @@ def run_simulation(env, system):
                 queues[s.value].append(len(system.__getattribute__(s.value).queue))
             else:
                 queues[s.value] = [len(system.__getattribute__(s.value).queue)]
-
-        # check_timeouts(env)
 
         yield env.timeout(1 / 60)
 
