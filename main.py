@@ -89,7 +89,7 @@ def init_services(service_nums):
     return services
 
 
-def do_service(env, service_time, customer_num, service_index, request, service_type):
+def do_service(env, service_time, service_time_total, customer_num, service_index, request, service_type):
     request.service_time = service_time
     if request_started[customer_num]:
         time_value = service_time
@@ -109,6 +109,7 @@ def do_service(env, service_time, customer_num, service_index, request, service_
         server_usage[service_type].append(time_value)
     else:
         server_usage[service_type] = [time_value]
+    service_time_total += time_value
 
 
 def handle_customer(env, customer_num, system, request):
@@ -123,8 +124,8 @@ def handle_customer(env, customer_num, system, request):
             # service_time = convert_to_minute(get_exp_sample(all_services[service_type.value].mean_time)[0])
             service_time = get_exp_sample(all_services[service_type.value].mean_time)[0]
             yield req
-            yield env.process(do_service(env, service_time, customer_num, s_idx, request, service_type))
-            service_time_total += request.service_time
+            yield env.process(do_service(env, service_time, service_time_total, customer_num, s_idx, request, service_type))
+            # service_time_total += request.service_time
 
     finish_time = env.now
     print("^^^^^^^^", finish_time, arrival_time, service_time_total)
