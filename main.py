@@ -95,15 +95,20 @@ def do_service(env, service_time, service_time_total, customer_num, service_inde
         time_value = service_time
         yield env.timeout(service_time / 60)
     else:
-        if request.max_time < env.now * 60 - arrivals[customer_num] * 60 and service_index == 0:
-            timeouts[customer_num] = True
+        if timeouts[customer_num]:
+            if request.max_time < env.now * 60 - arrivals[customer_num] * 60 and service_index == 0:
+                timeouts[customer_num] = True
+                request.service_time = 0
+                time_value = 0
+                yield env.timeout(0)
+            else:
+                request_started[customer_num] = True
+                time_value = service_time
+                yield env.timeout(service_time / 60)
+        else:
             request.service_time = 0
             time_value = 0
             yield env.timeout(0)
-        else:
-            request_started[customer_num] = True
-            time_value = service_time
-            yield env.timeout(service_time / 60)
 
     if service_type in server_usage.keys():
         server_usage[service_type].append(time_value)
@@ -124,8 +129,8 @@ def handle_customer(env, customer_num, system, request):
             # service_time = convert_to_minute(get_exp_sample(all_services[service_type.value].mean_time)[0])
             service_time = get_exp_sample(all_services[service_type.value].mean_time)[0]
             yield req
-            yield env.process(do_service(env, service_time, service_time_total, customer_num, s_idx, request, service_type))
-            # service_time_total += request.service_time
+            yield env.process(
+                do_service(env, service_time, service_time_total, customer_num, s_idx, request, service_type))
 
     finish_time = env.now
     print("^^^^^^^^", finish_time, arrival_time, service_time_total)
