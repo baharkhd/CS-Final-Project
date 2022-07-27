@@ -1,15 +1,15 @@
 import simpy
-import random
+from statistics import mean
 from entities import *
 from utils import *
-from statistics import mean
 
 all_requests = []
 all_services = []
-wait_times = []
+timeouts = []
 
 queues = {}
 server_usage = {}
+wait_times = {}
 
 request_orders = [
     RequestType.mobile_order,
@@ -57,8 +57,16 @@ def init_requests():
         RequestType.followup_order: 2
     }
 
+    max_times = [int(i) for i in input().split()]
+    max_times_dict = {}
+
+    for i in range(len(max_times)):
+        req = request_orders[i]
+        max_times_dict[req] = convert_to_minute(max_times[i])
+
     for request_type, l in zip(request_orders, request_likelihoods):
-        requests[request_type] = Request(request_type, l, services[request_type], priorities[request_type])
+        requests[request_type] = Request(request_type, l, services[request_type], max_times_dict[request_type],
+                                         priorities[request_type])
 
     return requests
 
@@ -69,11 +77,8 @@ def init_services(service_numbers):
     mean_service_times = [8, 5, 6, 9, 12, 2, 3]
     error_rates = [0.02, 0.02, 0.03, 0, 1, 0, 2, 0.01, 0.01]
 
-    max_times = [int(i) for i in input().split()]
-
     for i, (service_type, service_num) in enumerate(zip(service_orders, service_numbers)):
-        services[service_type.value] = Service(service_type, service_num, mean_service_times[i], max_times[i],
-                                               error_rates[i])
+        services[service_type.value] = Service(service_type, service_num, mean_service_times[i], error_rates[i])
 
     return services
 
@@ -94,20 +99,43 @@ def handle_customer(env, customer_num, system):
 
     service_time_total = 0
     for service_type in service_chain:
-        with system.__getattribute__(service_type.value).request() as request:
+        with system.__getattribute__(service_type.value).request(priority=request.priority) as req:
+            # print('---', service_type.value, '---')
+            # for q in system.__getattribute__(service_type.value).queue:
+            #     print('+++')
+            #     print(q.priority)
+            #     print('+++')
+            # print('********')
             # print(system.__getattribute__(service_type.value))
+            # print(len(system.__getattribute__(service_type.value).queue), ':', service_type.value)
+
+            # print(service_type.value, system.__getattribute__(service_type.value).capacity)
+
             service_time = convert_to_minute(get_exp_sample(all_services[service_type.value].mean_time)[0])
+
+            yield req
+
+            if service_time_total + arrival_time > request.max_time:
+                request.timeout = True
+                # print('man hanooz zendam koskesh')
+                break
+
             service_time_total += service_time
-            print(f"customer {customer_num} service {service_type}  service time:", round(service_time * 60, 2))
-            yield request
             yield env.process(do_service(env, service_time))
 
     finish_time = env.now
-    print(f"customer {customer_num} finish time:", round(finish_time * 60, 2))
 
-    print(f"customer {customer_num} wait time:", round((finish_time - arrival_time - service_time_total) * 60, 2))
+    # print(request.type)
+    # print(arrival_time)
+    # print(service_time_total)
+    # print(finish_time)
 
-    wait_times.append(finish_time - arrival_time - service_time_total)
+    if request.type in wait_times.keys():
+        wait_times[request.type].append(max(finish_time - arrival_time - service_time_total, 0))
+    else:
+        wait_times[request_type] = [max(finish_time - arrival_time - service_time_total, 0)]
+
+    timeouts.append(request.timeout)
 
 
 def run_simulation(env, system):
@@ -117,9 +145,14 @@ def run_simulation(env, system):
     while True:
         customers += request_rate
         for i in range(request_rate):
-            env.process(handle_customer(env, customer_id, system))
-            customer_id += 1
-        # print(customers)
+            env.process(handle_customer(env, customers, system))
+
+        for service in service_orders:
+            if service.value in queues.keys():
+                queues[service.value].append(len(system.__getattribute__(service.value).queue))
+            else:
+                queues[service.value] = [len(system.__getattribute__(service.value).queue)]
+
         yield env.timeout(1 / 60)
 
 
@@ -141,17 +174,24 @@ if __name__ == "__main__":
     all_requests = init_requests()
 
     start_simulation()
-    print("wait times in queues")
-    for wt in wait_times:
-        print(wt, "min")
 
-    print(len(wait_times))
-    print("wait times avg")
-    print(mean(wait_times), 'min')
-    print('avg queue lengths:')
+    print("**** wait times in queues ****")
+    total_waiting = 0
+    for wt in wait_times.keys():
+        total_waiting += mean(wait_times[wt])
+        print(f'{wt}: {mean(wait_times[wt])}')
+
+    print("**** wait times total avg ****")
+    print(total_waiting / len(wait_times), 'min')
+
+    print('**** avg queue lengths ****')
     for queue in queues.keys():
         print(f'{queue}: {mean(queues[queue])}')
 
-    print('server time usage')
+    print('**** server time usage ****')
     for server in server_usage.keys():
+        service = get_service(server, all_services)
         print(f'{server}: {sum(server_usage[server]) / total_time}')
+
+    print("**** timeout avg ****")
+    print(mean(timeouts))
