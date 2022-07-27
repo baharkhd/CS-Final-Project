@@ -95,7 +95,7 @@ def do_service(env, service_time, service_time_total, customer_num, service_inde
         time_value = service_time
         yield env.timeout(service_time / 60)
     else:
-        if timeouts[customer_num]:
+        if not timeouts[customer_num]:
             if request.max_time < env.now * 60 - arrivals[customer_num] * 60 and service_index == 0:
                 timeouts[customer_num] = True
                 request.service_time = 0
