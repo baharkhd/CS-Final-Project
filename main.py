@@ -89,7 +89,6 @@ def init_services(service_nums):
 
 
 def do_service(env, service_time, customer_num, service_index, request, service_type):
-    time_value = 0
     request.service_time = service_time
     if request_started[customer_num]:
         time_value = service_time
@@ -122,19 +121,8 @@ def handle_customer(env, customer_num, system, request):
         with system.__getattribute__(service_type.value).request(priority=request.priority) as req:
             service_time = convert_to_minute(get_exp_sample(all_services[service_type.value].mean_time)[0])
             yield req
-
-            # print("+++++", request.type.value, request.max_time)
-
-            yield env.process(do_service(env, service_time, customer_num, s_idx, request))
+            yield env.process(do_service(env, service_time, customer_num, s_idx, request, service_type))
             service_time_total += request.service_time
-
-            # if not request.service_time:
-            #     system.__getattribute__(service_type.value).cancel()
-
-            # if service_type in server_usage.keys():
-            #     server_usage[service_type].append(request.service_time)
-            # else:
-            #     server_usage[service_type] = [request.service_time]
 
     finish_time = env.now
 
