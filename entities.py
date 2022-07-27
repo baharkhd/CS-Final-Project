@@ -33,7 +33,7 @@ class Service:
 
 
 class Request:
-    def __init__(self, request_type, occurrence_likelihood, services, priority, max_time):
+    def __init__(self, request_type, occurrence_likelihood, services, max_time, priority):
         self.type = request_type
         self.occurrence_likelihood = occurrence_likelihood
         self.services = services

@@ -5,11 +5,16 @@ from utils import *
 
 all_requests = []
 all_services = []
-timeouts = []
+timeouts = {}
 
 queues = {}
 server_usage = {}
 wait_times = {}
+
+request_started = {}
+
+arrivals = {}
+customers_requests = {}
 
 request_orders = [
     RequestType.mobile_order,
@@ -83,75 +88,91 @@ def init_services(service_numbers):
     return services
 
 
-def do_service(env, service_time):
-    # service_time = get_exp_sample(all_services[service_type.value].mean_time)[0]
-    # print(service_time, convert_to_minute(service_time))
-    yield env.timeout(service_time)
+def do_service(env, service_time, customer_num, service_index, request):
+    if request_started[customer_num]:
+        yield env.timeout(service_time)
+    else:
+        # print("------", customer_num, service_index, request.max_time, env.now, arrivals[customer_num])
+        if request.max_time < env.now - arrivals[customer_num] and service_index == 0:
+            timeouts[customer_num] = True
+            yield env.timeout(0)
+        else:
+            request_started[customer_num] = True
+            yield env.timeout(service_time)
+    # if service_index == 0 and not timeouts[customer_num]:
+    #     request_started[customer_num] = True
+    #
+    # if customer_num in timeouts.keys():
+    #     if timeouts[customer_num]:
+    #         yield env.timeout(0)
+    #     else:
+    #         yield env.timeout(service_time)
+    # else:
+    #     yield env.timeout(service_time)
 
 
-def handle_customer(env, customer_num, system):
-    request_type = request_orders[get_random_number(request_likelihoods)]
-    request = get_request(request_type, all_requests)
+def handle_customer(env, customer_num, system, request):
+    request_type = request.type.value
     service_chain = request.services
 
     arrival_time = env.now
-    print(f"customer {customer_num} arrival time {round(arrival_time * 60, 2)} - request: {request_type}")
+
+    # print(f"customer {customer_num} arrival time {round(arrival_time * 60, 2)} - request: {request_type}")
 
     service_time_total = 0
-    for service_type in service_chain:
+    for s_idx, service_type in enumerate(service_chain):
         with system.__getattribute__(service_type.value).request(priority=request.priority) as req:
-            # print('---', service_type.value, '---')
-            # for q in system.__getattribute__(service_type.value).queue:
-            #     print('+++')
-            #     print(q.priority)
-            #     print('+++')
-            # print('********')
-            # print(system.__getattribute__(service_type.value))
-            # print(len(system.__getattribute__(service_type.value).queue), ':', service_type.value)
-
-            # print(service_type.value, system.__getattribute__(service_type.value).capacity)
-
             service_time = convert_to_minute(get_exp_sample(all_services[service_type.value].mean_time)[0])
-
             yield req
 
-            if service_time_total + arrival_time > request.max_time:
-                request.timeout = True
-                # print('man hanooz zendam koskesh')
-                break
+            # print("+++++", request.type.value, request.max_time)
 
             service_time_total += service_time
-            yield env.process(do_service(env, service_time))
+            yield env.process(do_service(env, service_time, customer_num, s_idx, request))
 
     finish_time = env.now
-
-    # print(request.type)
-    # print(arrival_time)
-    # print(service_time_total)
-    # print(finish_time)
 
     if request.type in wait_times.keys():
         wait_times[request.type].append(max(finish_time - arrival_time - service_time_total, 0))
     else:
         wait_times[request_type] = [max(finish_time - arrival_time - service_time_total, 0)]
 
-    timeouts.append(request.timeout)
+
+def check_timeouts(env):
+    global timeouts
+    now = env.now
+
+    for i in range(customer_id):
+        req = customers_requests[i]
+        arrival_time = arrivals[i]
+        if now - arrival_time > req.max_time and not request_started[i]:
+            timeouts[i] = True
+        else:
+            timeouts[i] = False
 
 
 def run_simulation(env, system):
-    customers = 0
-
-    customer_id = 0
+    global customer_id
     while True:
-        customers += request_rate
         for i in range(request_rate):
-            env.process(handle_customer(env, customers, system))
+            timeouts[customer_id] = False
+            request_started[customer_id] = False
 
-        for service in service_orders:
-            if service.value in queues.keys():
-                queues[service.value].append(len(system.__getattribute__(service.value).queue))
+            request_type = request_orders[get_random_number(request_likelihoods)]
+            request = get_request(request_type, all_requests)
+            customers_requests[customer_id] = request
+            arrivals[customer_id] = env.now
+
+            env.process(handle_customer(env, customer_id, system, request))
+            customer_id += 1
+
+        for s in service_orders:
+            if s.value in queues.keys():
+                queues[s.value].append(len(system.__getattribute__(s.value).queue))
             else:
-                queues[service.value] = [len(system.__getattribute__(service.value).queue)]
+                queues[s.value] = [len(system.__getattribute__(s.value).queue)]
+
+        # check_timeouts(env)
 
         yield env.timeout(1 / 60)
 
@@ -166,6 +187,7 @@ def start_simulation():
 
 if __name__ == "__main__":
     service_numbers = [int(i) for i in input().split()]
+    customer_id = 0
 
     request_rate = int(input())
     total_time = convert_to_minute(int(input()))
@@ -194,4 +216,4 @@ if __name__ == "__main__":
         print(f'{server}: {sum(server_usage[server]) / total_time}')
 
     print("**** timeout avg ****")
-    print(mean(timeouts))
+    print(mean(timeouts.values()))

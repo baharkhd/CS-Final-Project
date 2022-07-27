@@ -1,5 +1,6 @@
 import random
 import numpy as np
+import math
 
 
 def get_random_number(likelihoods):
@@ -33,3 +34,10 @@ def get_exp_sample(mean, samples_num=1):
 def convert_to_minute(seconds):
     # return int(seconds / 60)
     return seconds / 60
+
+
+def round_number(time):
+    if time - math.floor(time) <= 0.5:
+        return math.floor(time)
+    else:
+        return math.ceil(time)
