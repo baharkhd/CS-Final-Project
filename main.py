@@ -67,7 +67,8 @@ def init_requests():
 
     for i in range(len(max_times)):
         req = request_orders[i]
-        max_times_dict[req] = convert_to_minute(max_times[i])
+        # max_times_dict[req] = convert_to_minute(max_times[i])
+        max_times_dict[req] = max_times[i]
 
     for request_type, l in zip(request_orders, request_likelihoods):
         requests[request_type] = Request(request_type, l, services[request_type], max_times_dict[request_type],
@@ -119,7 +120,8 @@ def handle_customer(env, customer_num, system, request):
     service_time_total = 0
     for s_idx, service_type in enumerate(service_chain):
         with system.__getattribute__(service_type.value).request(priority=request.priority) as req:
-            service_time = convert_to_minute(get_exp_sample(all_services[service_type.value].mean_time)[0])
+            # service_time = convert_to_minute(get_exp_sample(all_services[service_type.value].mean_time)[0])
+            service_time = get_exp_sample(all_services[service_type.value].mean_time)[0]
             yield req
             yield env.process(do_service(env, service_time, customer_num, s_idx, request, service_type))
             service_time_total += request.service_time
@@ -153,7 +155,8 @@ def run_simulation(env, system):
             else:
                 queues[s.value] = [len(system.__getattribute__(s.value).queue)]
 
-        yield env.timeout(1 / 60)
+        # yield env.timeout(1 / 60)
+        yield env.timeout(1)
 
 
 def start_simulation():
@@ -169,7 +172,8 @@ if __name__ == "__main__":
     customer_id = 0
 
     request_rate = int(input())
-    total_time = convert_to_minute(int(input()))
+    # total_time = convert_to_minute(int(input()))
+    total_time = int(input())
 
     all_services = init_services(service_numbers)
     all_requests = init_requests()
@@ -183,7 +187,7 @@ if __name__ == "__main__":
         print(f'{wt}: {mean(wait_times[wt])}')
 
     print("**** wait times total avg ****")
-    print(total_waiting / len(wait_times), 'min')
+    print(total_waiting / len(wait_times), 'second')
 
     print('**** avg queue lengths ****')
     for queue in queues.keys():
